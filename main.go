@@ -1,48 +1,44 @@
 package main
 
 import (
-	"flag"
-	"fmt"
 	"golang.org/x/crypto/ssh"
+	"log"
 	"os"
 )
 
-var (
-	username = flag.String("username", "root", "username")
-	serverIP = flag.String("ip", "127.0.0.1", "IP")
-	sshPort  = flag.String("port", "22", "port")
-)
-
 func main() {
-	flag.Parse()
-	privateBytes, err := os.ReadFile("~/.ssh/id_rsa")
+	// 建立SSH客户端连接
+	client, err := ssh.Dial("tcp", "192.168.122.8:22", &ssh.ClientConfig{
+		User:            "root",
+		Auth:            []ssh.AuthMethod{ssh.Password("123456")},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	})
 	if err != nil {
-		panic(err)
+		log.Fatalf("SSH dial error: %s", err.Error())
 	}
-	private, err := ssh.ParsePrivateKey(privateBytes)
-	if err != nil {
-		panic(err)
-	}
-	var hostKey ssh.PublicKey
-	cfg := ssh.ClientConfig{
-		User:            *username,
-		Auth:            []ssh.AuthMethod{ssh.PublicKeys(private)},
-		HostKeyCallback: ssh.FixedHostKey(hostKey),
-	}
-	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%s", *serverIP, *sshPort), &cfg)
-	if err != nil {
-		panic(err)
-	}
-	_, req, err := client.OpenChannel("ch1", nil)
-	if err != nil {
-		panic(err)
-	}
-	d := <-req
-	fmt.Println(d.Type)
 
-	// 请求pty：标准输出终端
-	//ok, err := ch.SendRequest("pty-req", true, ssh.Marshal(ssh.Request{
-	//
-	//}))
+	// 建立新会话
+	session, err := client.NewSession()
+	defer session.Close()
+	if err != nil {
+		log.Fatalf("new session error: %s", err.Error())
+	}
 
+	session.Stdout = os.Stdout // 会话输出关联到系统标准输出设备
+	session.Stderr = os.Stderr // 会话错误输出关联到系统标准错误输出设备
+	session.Stdin = os.Stdin   // 会话输入关联到系统标准输入设备
+	modes := ssh.TerminalModes{
+		ssh.ECHO:          0,     // 禁用回显（0禁用，1启动）
+		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud
+		ssh.TTY_OP_OSPEED: 14400, //output speed = 14.4kbaud
+	}
+	if err = session.RequestPty("linux", 32, 160, modes); err != nil {
+		log.Fatalf("request pty error: %s", err.Error())
+	}
+	if err = session.Shell(); err != nil {
+		log.Fatalf("start shell error: %s", err.Error())
+	}
+	if err = session.Wait(); err != nil {
+		log.Fatalf("return error: %s", err.Error())
+	}
 }
