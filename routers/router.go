@@ -25,6 +25,9 @@ func init() {
 				&controllers.UserController{},
 			),
 		),
+		beego.NSNamespace("/ws",
+			beego.NSRouter("/test", &controllers.WebSocketCtl{}),
+		),
 	)
 	beego.AddNamespace(ns)
 }
