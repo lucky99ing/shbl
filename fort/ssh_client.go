@@ -1,4 +1,4 @@
-package main
+package fort
 
 import (
 	"fmt"
@@ -13,13 +13,13 @@ import (
 
 type SSHTerminal struct {
 	Session *ssh.Session
-	exitMsg string
-	stdout  io.Reader
-	stdin   io.Writer
-	stderr  io.Reader
+	ExitMsg string
+	Stdout  io.Reader
+	Stdin   io.Writer
+	Stderr  io.Reader
 }
 
-func main() {
+func RunSsh() {
 	sshConfig := &ssh.ClientConfig{
 		User: "root",
 		Auth: []ssh.AuthMethod{
@@ -86,10 +86,10 @@ func (t *SSHTerminal) updateTerminalSize() {
 func (t *SSHTerminal) interactiveSession() error {
 
 	defer func() {
-		if t.exitMsg == "" {
+		if t.ExitMsg == "" {
 			fmt.Fprintln(os.Stdout, "the connection was closed on the remote side on ", time.Now().Format(time.RFC822))
 		} else {
-			fmt.Fprintln(os.Stdout, t.exitMsg)
+			fmt.Fprintln(os.Stdout, t.ExitMsg)
 		}
 	}()
 
@@ -117,18 +117,18 @@ func (t *SSHTerminal) interactiveSession() error {
 
 	t.updateTerminalSize()
 
-	t.stdin, err = t.Session.StdinPipe()
+	t.Stdin, err = t.Session.StdinPipe()
 	if err != nil {
 		return err
 	}
-	t.stdout, err = t.Session.StdoutPipe()
+	t.Stdout, err = t.Session.StdoutPipe()
 	if err != nil {
 		return err
 	}
-	t.stderr, err = t.Session.StderrPipe()
+	t.Stderr, err = t.Session.StderrPipe()
 
-	go io.Copy(os.Stderr, t.stderr)
-	go io.Copy(os.Stdout, t.stdout)
+	go io.Copy(os.Stderr, t.Stderr)
+	go io.Copy(os.Stdout, t.Stdout)
 	go func() {
 		buf := make([]byte, 128)
 		for {
@@ -138,10 +138,10 @@ func (t *SSHTerminal) interactiveSession() error {
 				return
 			}
 			if n > 0 {
-				_, err = t.stdin.Write(buf[:n])
+				_, err = t.Stdin.Write(buf[:n])
 				if err != nil {
 					fmt.Println(err)
-					t.exitMsg = err.Error()
+					t.ExitMsg = err.Error()
 					return
 				}
 			}
